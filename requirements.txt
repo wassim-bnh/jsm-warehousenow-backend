@@ -5,3 +5,5 @@ redis
 httpx
 requests
 googlemaps
+openrouteservice
+mapbox
