@@ -1,11 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-import requests
-from base64 import b64encode
-from requests.auth import HTTPBasicAuth
 from geolocation.route import geolocation_router
-from jsm_warehouse.jsm_warehouse_service import cache_warehouses
-from jsm_warehouse.route import warehouse_router
+from warehouse.warehouse_route import warehouse_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

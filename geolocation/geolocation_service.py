@@ -1,43 +1,23 @@
 
-import os
-from typing import List
+import math
+import requests
 
+def haversine(lat1, lon1, lat2, lon2):
+    R = 3958.8  # Radius of earth in miles
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
 
-GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
-from fastapi import HTTPException
-import httpx
-
-
-async def get_distances(origins: str, destinations: List[str]) -> List[float]:
-    url = "https://maps.googleapis.com/maps/api/distancematrix/json"
-    params = {
-        "origins": origins,
-        "destinations": "|".join(destinations),
-        "key": GOOGLE_MAPS_API_KEY,
-        "units": "metric",
-        "mode": "driving"
-    }
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, params=params)
-
-    if response.status_code != 200:
-        raise HTTPException(status_code=502, detail="Google Maps Distance Matrix API error")
-
+def get_coordinates(zip_code):
+    url = f"https://nominatim.openstreetmap.org/search?postalcode={zip_code}&country=USA&format=json"
+    response = requests.get(url, headers={"User-Agent": "my-app"})
+    response.raise_for_status()
     data = response.json()
-    if data.get("status") != "OK":
-        raise HTTPException(status_code=400, detail="Invalid response from Google Maps API")
-
-    distances = []
-    rows = data.get("rows", [])
-    if not rows or not rows[0].get("elements"):
-        raise HTTPException(status_code=400, detail="No distance data available")
-
-    elements = rows[0]["elements"]
-    for el in elements:
-        if el.get("status") == "OK":
-            distances.append(el["distance"]["value"])
-        else:
-            distances.append(float('inf'))
-    return distances
+    if not data:
+        return None
+    return float(data[0]["lat"]), float(data[0]["lon"])
