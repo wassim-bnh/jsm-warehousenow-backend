@@ -56,14 +56,32 @@ async def get_driving_distance_and_time_mapbox(origin_coords: tuple, dest_coords
             return None
 
 
-def get_coordinates(zip_code):
-    url = f"https://nominatim.openstreetmap.org/search?postalcode={zip_code}&country=USA&format=json"
-    response = requests.get(url, headers={"User-Agent": "my-app"})
-    response.raise_for_status()
-    data = response.json()
-    if not data:
+def get_coordinates(zip_code: str):
+    if not MAPBOX_TOKEN:
+        raise ValueError("MAPBOX_TOKEN is missing. Please set it in your environment variables.")
+
+    url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{zip_code}.json"
+    params = {
+        "access_token": MAPBOX_TOKEN,
+        "country": "US",  # Restrict to USA
+        "limit": 1         # We only need the first match
+    }
+
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        if not data.get("features"):
+            return None
+
+        # Mapbox returns coordinates as [lon, lat]
+        lon, lat = data["features"][0]["center"]
+        return lat, lon
+
+    except Exception as e:
+        print(f"Error fetching coordinates from Mapbox: {e}")
         return None
-    return float(data[0]["lat"]), float(data[0]["lon"])
 
 '''
 async def get_driving_distance_google(origin_coords: tuple, dest_coords: tuple) -> float:
