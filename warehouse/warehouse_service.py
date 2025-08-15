@@ -1,8 +1,6 @@
 import os
-import json
-import googlemaps
+
 from openai import BaseModel
-import redis
 import httpx
 
 from geolocation.geolocation_service import get_coordinates, get_driving_distance_mapbox, haversine

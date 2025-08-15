@@ -2,9 +2,9 @@
 import math
 import requests
 import httpx
+import os
 
-
-MAPBOX_TOKEN = "sk.eyJ1Ijoid2Fzc2ltYm4iLCJhIjoiY21lYmxmOXptMTFzNzJqcXU1dTVmcmNlYSJ9.tkrKoyVdKp8dVM4bu68bJA"
+MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 3958.8  # Radius of earth in miles
