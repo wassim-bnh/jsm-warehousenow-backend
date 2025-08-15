@@ -3,7 +3,7 @@ import os
 from openai import BaseModel
 import httpx
 
-from geolocation.geolocation_service import get_coordinates, get_driving_distance_mapbox, haversine
+from geolocation.geolocation_service import get_coordinates, get_driving_distance_and_time_mapbox
 from warehouse.models import WarehouseData
 
 AIRTABLE_TOKEN = os.getenv("AIRTABLE_TOKEN")
@@ -62,15 +62,20 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
         if not wh_coords:
             continue
 
-        # Use Mapbox driving distance TODO migrate to google maps
-        distance = await get_driving_distance_mapbox(origin_coords, wh_coords)
-        if distance is None:
+        # Use Mapbox driving distance and time
+        result = await get_driving_distance_and_time_mapbox(origin_coords, wh_coords)
+        if not result:
             continue
 
-        if distance <= radius_miles:
+        distance_miles = result["distance_miles"]
+        duration_minutes = result["duration_minutes"]
+
+        if distance_miles <= radius_miles:
             wh_copy = wh.copy()
-            wh_copy["distance_miles"] = distance
+            wh_copy["distance_miles"] = distance_miles
+            wh_copy["duration_minutes"] = duration_minutes
             nearby.append(wh_copy)
 
     nearby.sort(key=lambda x: x["distance_miles"])
     return {"origin_zip": origin_zip, "warehouses": nearby}
+

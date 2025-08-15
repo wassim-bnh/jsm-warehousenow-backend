@@ -1,8 +1,11 @@
 
 import math
+from dotenv import load_dotenv
 import requests
 import httpx
 import os
+
+load_dotenv()
 
 MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
 
@@ -17,9 +20,9 @@ def haversine(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-async def get_driving_distance_mapbox(origin_coords: tuple, dest_coords: tuple) -> float:
+async def get_driving_distance_and_time_mapbox(origin_coords: tuple, dest_coords: tuple) -> dict:
     """
-    Get driving distance in miles using Mapbox Directions API
+    Get driving distance (miles) and time (minutes) using Mapbox Directions API.
     origin_coords and dest_coords are tuples: (lat, lon)
     """
     origin_lon, origin_lat = origin_coords[1], origin_coords[0]
@@ -36,13 +39,22 @@ async def get_driving_distance_mapbox(origin_coords: tuple, dest_coords: tuple) 
             resp = await client.get(url, params=params)
             resp.raise_for_status()
             data = resp.json()
-            # Distance is returned in meters
-            distance_meters = data["routes"][0]["distance"]
-            distance_miles = distance_meters * 0.000621371  # meters → miles
-            return distance_miles
+
+            if not data["routes"]:
+                return None
+
+            route = data["routes"][0]
+            distance_miles = route["distance"] * 0.000621371  # meters → miles
+            duration_minutes = route["duration"] / 60  # seconds → minutes
+
+            return {
+                "distance_miles": distance_miles,
+                "duration_minutes": duration_minutes
+            }
         except Exception as e:
-            print(f"Error fetching driving distance (Mapbox): {e}")
+            print(f"Error fetching driving data (Mapbox): {e}")
             return None
+
 
 def get_coordinates(zip_code):
     url = f"https://nominatim.openstreetmap.org/search?postalcode={zip_code}&country=USA&format=json"
