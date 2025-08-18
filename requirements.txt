@@ -7,3 +7,4 @@ requests
 googlemaps
 openrouteservice
 mapbox
+google-generativeai

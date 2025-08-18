@@ -1,6 +1,6 @@
 import os
 from fastapi import APIRouter
-from openai import BaseModel
+from pydantic import BaseModel
 
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 CACHE_KEY_WAREHOUSES = "warehouses_cache"

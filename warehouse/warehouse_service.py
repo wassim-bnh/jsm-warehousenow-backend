@@ -1,11 +1,12 @@
 import os
 from typing import List
 
-from openai import BaseModel
+from pydantic import BaseModel
 import httpx
 
 from geolocation.geolocation_service import get_coordinates, get_driving_distance_and_time_mapbox
 from warehouse.models import WarehouseData
+from gemini_analysis.ai_analysis import analyze_warehouse_with_gemini
 
 AIRTABLE_TOKEN = os.getenv("AIRTABLE_TOKEN")
 BASE_ID = os.getenv("BASE_ID")
@@ -101,6 +102,9 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
             nearby.append(wh_copy)
 
     nearby.sort(key=lambda x: (x["tier_rank"], x["distance_miles"]))
+
+    for idx, wh in enumerate(nearby, start=1):
+        wh["ai_analysis"] = await analyze_warehouse_with_gemini(wh, idx, len(nearby))
 
     return {"origin_zip": origin_zip, "warehouses": nearby}
 
