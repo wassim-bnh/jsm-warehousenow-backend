@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 from openai import BaseModel
 import httpx
@@ -45,12 +46,29 @@ async def fetch_warehouses_from_airtable() -> list[WarehouseData]:
     return records
 
 # Find nearby warehouses (openStreetMap)
+def _tier_rank(tier: str) -> int:
+    """Lower number = higher priority."""
+    if not tier:
+        return 99
+    t = str(tier).strip().lower()
+    order = {"gold": 0, "silver": 1, "bronze": 2}
+    return order.get(t, 99)
+
+def find_missing_fields(fields: dict) -> List[str]:
+    """Return a list of field names that are empty or missing."""
+    missing = []
+    for key, value in fields.items():
+        if value in (None, "", [], {}):
+            missing.append(key)
+    return missing
+
+
 async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
     origin_coords = get_coordinates(origin_zip)
     if not origin_coords:
         return {"error": "Invalid ZIP code"}
-    
-    warehouses = await fetch_warehouses_from_airtable()
+
+    warehouses: List[WarehouseData] = await fetch_warehouses_from_airtable()
     nearby = []
 
     for wh in warehouses:
@@ -62,7 +80,6 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
         if not wh_coords:
             continue
 
-        # Use Mapbox driving distance and time
         result = await get_driving_distance_and_time_mapbox(origin_coords, wh_coords)
         if not result:
             continue
@@ -74,8 +91,17 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
             wh_copy = wh.copy()
             wh_copy["distance_miles"] = distance_miles
             wh_copy["duration_minutes"] = duration_minutes
+            wh_copy["tier_rank"] = _tier_rank(wh["fields"].get("Tier"))
+
+            wh_copy["tags"] = find_missing_fields(wh["fields"])
+            if wh_copy["tags"]:
+                wh_copy["has_missed_fields"] = True
+            else: 
+                wh_copy["has_missed_fields"] = False
             nearby.append(wh_copy)
 
-    nearby.sort(key=lambda x: x["distance_miles"])
+    nearby.sort(key=lambda x: (x["tier_rank"], x["distance_miles"]))
+
     return {"origin_zip": origin_zip, "warehouses": nearby}
+
 
