@@ -8,3 +8,5 @@ googlemaps
 openrouteservice
 mapbox
 google-generativeai
+aiosmtplib
+pydantic[email]

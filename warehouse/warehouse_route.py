@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
-from warehouse.models import LocationRequest, ResponseModel
+from services.messaging.email_service import send_bulk_email
+from warehouse.models import LocationRequest, ResponseModel, SendEmailData
 from warehouse.warehouse_service import fetch_warehouses_from_airtable, find_nearby_warehouses
 
 
@@ -14,7 +15,10 @@ async def warehouses():
 
 
 @warehouse_router.post("/nearby_warehouses")
-async def nearby_warehouses(request: LocationRequest):
+async def find_nearby_warehouses_endpoint(request: LocationRequest):
     nearby_warehouses = await find_nearby_warehouses(request.zip_code, request.radius_miles)
     return ResponseModel(status="success", data=nearby_warehouses)
    
+@warehouse_router.post("/send_email")
+async def send_bulk_email_endpoint(emails_data: list[SendEmailData]):
+    response = await send_bulk_email(emails_data)

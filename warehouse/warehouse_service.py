@@ -4,9 +4,9 @@ from typing import List
 from pydantic import BaseModel
 import httpx
 
-from geolocation.geolocation_service import get_coordinates, get_driving_distance_and_time_mapbox
+from services.geolocation.geolocation_service import get_coordinates, get_driving_distance_and_time_mapbox
 from warehouse.models import WarehouseData
-from gemini_analysis.ai_analysis import analyze_warehouse_with_gemini
+from services.gemini_services.ai_analysis import analyze_warehouse_with_gemini
 
 AIRTABLE_TOKEN = os.getenv("AIRTABLE_TOKEN")
 BASE_ID = os.getenv("BASE_ID")
