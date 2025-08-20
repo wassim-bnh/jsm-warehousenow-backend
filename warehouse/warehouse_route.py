@@ -1,4 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+import httpx
+import requests
 
 from services.messaging.email_service import send_bulk_email
 from warehouse.models import LocationRequest, ResponseModel, SendEmailData
@@ -10,16 +12,32 @@ warehouse_router = APIRouter()
 
 @warehouse_router.get("/warehouses")
 async def warehouses():
-    data = await fetch_warehouses_from_airtable()
-    return ResponseModel(status="success", data=data)
+    try:
+        data = await fetch_warehouses_from_airtable()
+        return ResponseModel(status="success", data=data)
+    except (httpx.HTTPError, requests.exceptions.RequestException) as e:
+        raise HTTPException(status_code=502, detail=f"Error fetching warehouses: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
 @warehouse_router.post("/nearby_warehouses")
 async def find_nearby_warehouses_endpoint(request: LocationRequest):
-    nearby_warehouses = await find_nearby_warehouses(request.zip_code, request.radius_miles)
-    return ResponseModel(status="success", data=nearby_warehouses)
-   
+    try:
+        nearby_warehouses = await find_nearby_warehouses(request.zip_code, request.radius_miles)
+        return ResponseModel(status="success", data=nearby_warehouses)
+    except (httpx.HTTPError, requests.exceptions.RequestException) as e:
+        raise HTTPException(status_code=502, detail=f"Error fetching nearby warehouses: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
 @warehouse_router.post("/send_email")
 async def send_bulk_email_endpoint(emails_data: list[SendEmailData]):
-    response = await send_bulk_email(emails_data)
-    return ResponseModel(status="success", data=response)
+    try:
+        response = await send_bulk_email(emails_data)
+        return ResponseModel(status="success", data=response)
+    except (httpx.HTTPError, requests.exceptions.RequestException) as e:
+        raise HTTPException(status_code=502, detail=f"Error sending emails: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")

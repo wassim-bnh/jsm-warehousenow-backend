@@ -3,8 +3,9 @@ from typing import List
 
 from pydantic import BaseModel
 import httpx
+import copy
 
-from services.geolocation.geolocation_service import get_coordinates, get_driving_distance_and_time_mapbox
+from services.geolocation.geolocation_service import get_coordinates_mapbox, get_driving_distance_and_time_mapbox, get_coordinates_google, get_driving_distance_and_time_google
 from warehouse.models import WarehouseData
 from services.gemini_services.ai_analysis import analyze_warehouse_with_gemini
 
@@ -65,7 +66,7 @@ def find_missing_fields(fields: dict) -> List[str]:
 
 
 async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
-    origin_coords = get_coordinates(origin_zip)
+    origin_coords = get_coordinates_mapbox(origin_zip)
     if not origin_coords:
         return {"error": "Invalid ZIP code"}
 
@@ -77,11 +78,11 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
         if not wh_zip:
             continue
 
-        wh_coords = get_coordinates(wh_zip)
+        wh_coords = get_coordinates_google(wh_zip)
         if not wh_coords:
             continue
 
-        result = await get_driving_distance_and_time_mapbox(origin_coords, wh_coords)
+        result = await get_driving_distance_and_time_google(origin_coords, wh_coords)
         if not result:
             continue
 
@@ -89,7 +90,7 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
         duration_minutes = result["duration_minutes"]
 
         if distance_miles <= radius_miles:
-            wh_copy = wh.copy()
+            wh_copy = copy.copy(wh)
             wh_copy["distance_miles"] = distance_miles
             wh_copy["duration_minutes"] = duration_minutes
             wh_copy["tier_rank"] = _tier_rank(wh["fields"].get("Tier"))
