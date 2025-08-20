@@ -22,3 +22,4 @@ async def find_nearby_warehouses_endpoint(request: LocationRequest):
 @warehouse_router.post("/send_email")
 async def send_bulk_email_endpoint(emails_data: list[SendEmailData]):
     response = await send_bulk_email(emails_data)
+    return ResponseModel(status="success", data=response)

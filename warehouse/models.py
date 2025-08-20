@@ -51,7 +51,5 @@ class ResponseModel(GenericModel, Generic[T]):
 
 class SendEmailData(BaseModel):
     email: str
-    subject: str
-    body: str
-    cc: Optional[List[EmailStr]] = None
-    bcc: Optional[List[EmailStr]] = None
+    services: list[str]
+    adress: str

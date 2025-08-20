@@ -25,24 +25,31 @@ async def send_email(email_data: SendEmailData):
     """
     Send a single email using SMTP
     """
-    ai_email = await generate_email_prompt(
-            warehouse_name=email_data.warehouse_name,
-            contact_name=email_data.contact_name
-        )
-    email_data.subject = email_data.subject or ai_email["subject"]
-    email_data.body = email_data.body or ai_email["body"]
     
+    if not email_data.services:
+        services_str = "general warehousing services"
+    elif len(email_data.services) == 1:
+        services_str = email_data.services[0]
+    else:
+        services_str = ", ".join(email_data.services[:-1]) + f" and {email_data.services[-1]}"
+
+    # Construct subject & body
+    subject = f"Request for {services_str} near {email_data.adress}"
+    body = f"""Hi, 
+    
+we have a request and would like to know if you can help with this. Please provide pricing.
+Commodity:
+Loading method: palletized / slip sheets / floor loaded
+Pictures attached:
+WarehouseNow Team
+        """
+
+    # Build message
     message = EmailMessage()
     message["From"] = SMTP_USER
     message["To"] = email_data.email
-    message["Subject"] = email_data.subject
-    
-    if email_data.cc:
-        message["Cc"] = ", ".join(email_data.cc)
-    if email_data.bcc:
-        message["Bcc"] = ", ".join(email_data.bcc)
-
-    message.set_content(email_data.body)
+    message["Subject"] = subject
+    message.set_content(body)
 
     try:
         await aiosmtplib.send(
