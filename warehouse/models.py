@@ -9,7 +9,7 @@ class LocationRequest(BaseModel):
 
 
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 class WarehouseFields(BaseModel):
     City: Optional[str]
@@ -48,3 +48,8 @@ T = TypeVar("T")
 class ResponseModel(GenericModel, Generic[T]):
     status: str
     data: T
+
+class SendEmailData(BaseModel):
+    email: str
+    services: list[str]
+    adress: str
