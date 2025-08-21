@@ -8,6 +8,9 @@ import copy
 from services.geolocation.geolocation_service import get_coordinates_mapbox, get_driving_distance_and_time_mapbox, get_coordinates_google, get_driving_distance_and_time_google
 from warehouse.models import WarehouseData
 from services.gemini_services.ai_analysis import analyze_warehouse_with_gemini
+from dotenv import load_dotenv
+
+load_dotenv()
 
 AIRTABLE_TOKEN = os.getenv("AIRTABLE_TOKEN")
 BASE_ID = os.getenv("BASE_ID")
@@ -71,7 +74,7 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
         return {"error": "Invalid ZIP code"}
 
     warehouses: List[WarehouseData] = await fetch_warehouses_from_airtable()
-    nearby = []
+    nearby: List[WarehouseData] = []
 
     for wh in warehouses:
         wh_zip = wh["fields"].get("Zip")
@@ -100,6 +103,7 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
                 wh_copy["has_missed_fields"] = True
             else: 
                 wh_copy["has_missed_fields"] = False
+            
             nearby.append(wh_copy)
 
     nearby.sort(key=lambda x: (x["tier_rank"], x["duration_minutes"], x["distance_miles"]))

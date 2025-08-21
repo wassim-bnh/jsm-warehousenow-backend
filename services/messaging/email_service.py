@@ -7,7 +7,9 @@ from email.message import EmailMessage
 from warehouse.models import SendEmailData
 from services.gemini_services.generate_email import generate_email_prompt
 import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
 SMTP_HOST = os.getenv("SMTP_HOST")    
 SMTP_PORT = os.getenv("SMTP_PORT")

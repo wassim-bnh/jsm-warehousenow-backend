@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.encoders import jsonable_encoder
 import httpx
 import requests
 
@@ -25,7 +26,8 @@ async def warehouses():
 async def find_nearby_warehouses_endpoint(request: LocationRequest):
     try:
         nearby_warehouses = await find_nearby_warehouses(request.zip_code, request.radius_miles)
-        return ResponseModel(status="success", data=nearby_warehouses)
+        encoded = jsonable_encoder(nearby_warehouses, exclude_none=False)
+        return ResponseModel(status="success", data=encoded)
     except (httpx.HTTPError, requests.exceptions.RequestException) as e:
         raise HTTPException(status_code=502, detail=f"Error fetching nearby warehouses: {str(e)}")
     except Exception as e:

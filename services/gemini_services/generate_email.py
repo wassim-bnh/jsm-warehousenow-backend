@@ -2,6 +2,9 @@
 from typing import Dict
 import google.generativeai as genai
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Load your Gemini API key from environment
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
