@@ -4,10 +4,14 @@ from dotenv import load_dotenv
 import requests
 import httpx
 import os
+import googlemaps
 
 load_dotenv()
 
 MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+
+gmaps = googlemaps.Client(key=GOOGLE_MAPS_API_KEY)
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 3958.8  # Radius of earth in miles
@@ -56,7 +60,7 @@ async def get_driving_distance_and_time_mapbox(origin_coords: tuple, dest_coords
             return None
 
 
-def get_coordinates(zip_code: str):
+def get_coordinates_mapbox(zip_code: str):
     if not MAPBOX_TOKEN:
         raise ValueError("MAPBOX_TOKEN is missing. Please set it in your environment variables.")
 
@@ -83,10 +87,34 @@ def get_coordinates(zip_code: str):
         print(f"Error fetching coordinates from Mapbox: {e}")
         return None
 
-'''
-async def get_driving_distance_google(origin_coords: tuple, dest_coords: tuple) -> float:
+def get_coordinates_google(zip_code: str):
     """
-    Get driving distance in miles using Google Maps Directions API
+    Get coordinates (lat, lon) for a given ZIP code using Google Maps Geocoding API.
+    """
+    if not GOOGLE_MAPS_API_KEY:
+        raise ValueError("GOOGLE_MAPS_API_KEY is missing. Please set it in your environment variables.")
+
+    try:
+        geocode_result = gmaps.geocode(
+            address=zip_code,
+            components={"country": "US"}  # Restrict search to USA
+        )
+
+        if not geocode_result:
+            return None
+
+        location = geocode_result[0]['geometry']['location']
+        lat, lon = location['lat'], location['lng']
+        return lat, lon
+
+    except Exception as e:
+        print(f"Error fetching coordinates from Google Maps: {e}")
+        return None
+
+
+async def get_driving_distance_and_time_google(origin_coords: tuple, dest_coords: tuple) -> dict:
+    """
+    Get driving distance (miles) and time (minutes) using Google Maps Directions API.
     origin_coords and dest_coords are tuples: (lat, lon)
     """
     try:
@@ -95,11 +123,24 @@ async def get_driving_distance_google(origin_coords: tuple, dest_coords: tuple) 
             destination=dest_coords,
             mode="driving"
         )
-        # Distance in meters
-        distance_meters = directions_result[0]['legs'][0]['distance']['value']
+
+        if not directions_result:
+            return None
+
+        leg = directions_result[0]['legs'][0]
+
+        # Distance in meters → miles
+        distance_meters = leg['distance']['value']
         distance_miles = distance_meters * 0.000621371
-        return distance_miles
+
+        # Duration in seconds → minutes
+        duration_seconds = leg['duration']['value']
+        duration_minutes = duration_seconds / 60
+
+        return {
+            "distance_miles": distance_miles,
+            "duration_minutes": duration_minutes
+        }
     except Exception as e:
-        print(f"Error fetching driving distance (Google Maps): {e}")
+        print(f"Error fetching driving data (Google Maps): {e}")
         return None
-'''

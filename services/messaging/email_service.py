@@ -36,11 +36,14 @@ async def send_email(email_data: SendEmailData):
     # Construct subject & body
     subject = f"Request for {services_str} near {email_data.adress}"
     body = f"""Hi, 
-    
-we have a request and would like to know if you can help with this. Please provide pricing.
+
+We have a request and would like to know if you can help with this.
+Please provide the following info below:
+Pricing:
 Commodity:
 Loading method: palletized / slip sheets / floor loaded
-Pictures attached:
+Pictures attached below:
+Best,
 WarehouseNow Team
         """
 
