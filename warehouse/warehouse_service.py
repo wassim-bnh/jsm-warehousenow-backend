@@ -6,12 +6,11 @@ import httpx
 import copy
 
 from services.geolocation.geolocation_service import get_coordinates_mapbox, get_driving_distance_and_time_mapbox, get_coordinates_google, get_driving_distance_and_time_google
-from warehouse.models import WarehouseData
+from warehouse.models import FilterWarehouseData, WarehouseData
 from services.gemini_services.ai_analysis import analyze_warehouse_with_gemini
 from dotenv import load_dotenv
 
 load_dotenv()
-
 AIRTABLE_TOKEN = os.getenv("AIRTABLE_TOKEN")
 BASE_ID = os.getenv("BASE_ID")
 TABLE_NAME = "Imported table" 
@@ -60,13 +59,13 @@ def _tier_rank(tier: str) -> int:
     return order.get(t, 99)
 
 def find_missing_fields(fields: dict) -> List[str]:
-    """Return a list of field names that are empty or missing."""
+    """Return a list of field names that are empty or missing compared to FilterWarehouseData"""
     missing = []
-    for key, value in fields.items():
+    for field_name in FilterWarehouseData.model_fields.keys():
+        value = fields.get(field_name)
         if value in (None, "", [], {}):
-            missing.append(key)
+            missing.append(field_name)
     return missing
-
 
 async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
     origin_coords = get_coordinates_mapbox(origin_zip)

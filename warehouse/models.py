@@ -42,6 +42,19 @@ class WarehouseData(BaseModel):
     id: str
     fields: WarehouseFields
 
+class FilterWarehouseData(BaseModel):
+    City: Optional[str] = None
+    State: Optional[str] = None
+    Zip: Optional[int] = None
+    Status: Optional[str] = None
+    Tier: Optional[str] = None
+    Hazmat: Optional[str] = None
+    Temp_Control: Optional[str] = None
+    Food_Grade: Optional[str] = None
+    Paper_Rolls: Optional[str] = None
+    Services: Optional[List[str]] = None
+    Notes_Pricing: Optional[str] = None
+    Insurance: Optional[str] = None
 
 T = TypeVar("T")
 
