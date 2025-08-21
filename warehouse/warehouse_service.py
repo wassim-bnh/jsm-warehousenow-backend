@@ -7,7 +7,7 @@ import copy
 
 from services.geolocation.geolocation_service import get_coordinates_mapbox, get_driving_distance_and_time_mapbox, get_coordinates_google, get_driving_distance_and_time_google
 from warehouse.models import FilterWarehouseData, WarehouseData
-from services.gemini_services.ai_analysis import analyze_warehouse_with_gemini
+from services.gemini_services.ai_analysis import GENERAL_AI_ANALYSIS, analyze_warehouse_with_gemini
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -108,7 +108,10 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
     nearby.sort(key=lambda x: (x["tier_rank"], x["duration_minutes"], x["distance_miles"]))
 
     
-    ai_analysis= await analyze_warehouse_with_gemini(nearby)
+    try:
+        ai_analysis = await analyze_warehouse_with_gemini(nearby)
+    except Exception:
+        ai_analysis = GENERAL_AI_ANALYSIS
 
     return {"origin_zip": origin_zip, "warehouses": nearby, "ai_analysis": ai_analysis}
 
