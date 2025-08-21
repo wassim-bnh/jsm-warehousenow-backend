@@ -12,31 +12,31 @@ from typing import List, Optional
 from pydantic import BaseModel, EmailStr
 
 class WarehouseFields(BaseModel):
-    City: Optional[str]
-    State: Optional[str]
-    Zip: Optional[int]
-    Name: Optional[str]
-    Full_Address: Optional[List[str]] 
-    Status: Optional[str]
-    Tier: Optional[str]
-    Contact_1: Optional[str]
-    Email_1: Optional[str]
-    Office_number: Optional[str]
-    Cell_number_1: Optional[str]
-    Contact_2: Optional[str]
-    Cell_number_2: Optional[str]
-    Email_2: Optional[str]
-    Email_3: Optional[str]
-    Hours: Optional[str]
-    Hazmat: Optional[str]
-    Temp_Control: Optional[str]
-    Food_Grade: Optional[str]
-    Paper_Rolls: Optional[str]
-    Services: Optional[List[str]]
-    Website: Optional[str]
-    Notes_Pricing: Optional[str]
-    Insurance: Optional[str]
-    createdTime: str
+    City: Optional[str] = None
+    State: Optional[str] = None
+    Zip: Optional[int] = None
+    Name: Optional[str] = None
+    Full_Address: Optional[List[str]] = None
+    Status: Optional[str] = None
+    Tier: Optional[str] = None
+    Contact_1: Optional[str] = None
+    Email_1: Optional[str] = None
+    Office_number: Optional[str] = None
+    Cell_number_1: Optional[str] = None
+    Contact_2: Optional[str] = None
+    Cell_number_2: Optional[str] = None
+    Email_2: Optional[str] = None
+    Email_3: Optional[str] = None
+    Hours: Optional[str] = None
+    Hazmat: Optional[str] = None
+    Temp_Control: Optional[str] = None
+    Food_Grade: Optional[str] = None
+    Paper_Rolls: Optional[str] = None
+    Services: Optional[List[str]] = None
+    Website: Optional[str] = None
+    Notes_Pricing: Optional[str] = None
+    Insurance: Optional[str] = None
+    createdTime: str = None
 
 class WarehouseData(BaseModel):
     id: str

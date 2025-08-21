@@ -10,3 +10,4 @@ mapbox
 google-generativeai
 aiosmtplib
 pydantic[email]
+mangum
