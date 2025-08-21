@@ -102,11 +102,11 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
                 wh_copy["has_missed_fields"] = False
             nearby.append(wh_copy)
 
-    nearby.sort(key=lambda x: (x["tier_rank"], x["distance_miles"]))
+    nearby.sort(key=lambda x: (x["tier_rank"], x["duration_minutes"], x["distance_miles"]))
 
-    for idx, wh in enumerate(nearby, start=1):
-        wh["ai_analysis"] = await analyze_warehouse_with_gemini(wh, idx, len(nearby))
+    
+    ai_analysis= await analyze_warehouse_with_gemini(nearby)
 
-    return {"origin_zip": origin_zip, "warehouses": nearby}
+    return {"origin_zip": origin_zip, "warehouses": nearby, "ai_analysis": ai_analysis}
 
 
