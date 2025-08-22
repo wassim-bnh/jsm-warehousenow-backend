@@ -5,7 +5,6 @@ from warehouse.models import SendEmailData
 import aiosmtplib
 from email.message import EmailMessage
 from warehouse.models import SendEmailData
-from services.gemini_services.generate_email import generate_email_prompt
 import os
 from dotenv import load_dotenv
 

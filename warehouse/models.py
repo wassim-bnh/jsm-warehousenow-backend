@@ -1,7 +1,7 @@
 
-from openai import BaseModel
 from typing import List, Generic, TypeVar
 from pydantic.generics import GenericModel
+from pydantic import BaseModel
 
 class LocationRequest(BaseModel):
     zip_code: str
@@ -9,7 +9,7 @@ class LocationRequest(BaseModel):
 
 
 from typing import List, Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 class WarehouseFields(BaseModel):
     City: Optional[str] = None
