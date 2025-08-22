@@ -11,3 +11,4 @@ google-generativeai
 aiosmtplib
 pydantic[email]
 mangum
+gunicorn

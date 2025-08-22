@@ -9,7 +9,7 @@ async def lifespan(app: FastAPI):
     print("Caching..")
     yield
     print("App is shutting down...")
-
+    
 
 app = FastAPI(title="jsm-warehousenow", lifespan=lifespan)
 
