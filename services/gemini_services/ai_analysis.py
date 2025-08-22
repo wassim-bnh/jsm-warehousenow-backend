@@ -3,6 +3,13 @@ import os
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
+GENERAL_AI_ANALYSIS = """
+The warehouse search results show multiple options ranked primarily by tier (Gold > Silver > Bronze) 
+and secondarily by driving distance and time. Top-ranked warehouses balance high tier status 
+with proximity to the origin zip code. Attention should be paid to any missing data fields, 
+as incomplete information may impact decision-making for logistics planning.
+"""
+
 async def analyze_warehouse_with_gemini(warehouses: list[dict]) -> str:
     """
     Generate a holistic AI analysis of the entire warehouse search results,

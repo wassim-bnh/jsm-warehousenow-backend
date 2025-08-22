@@ -7,7 +7,7 @@ import copy
 
 from services.geolocation.geolocation_service import get_coordinates_mapbox, get_driving_distance_and_time_mapbox, get_coordinates_google, get_driving_distance_and_time_google
 from warehouse.models import FilterWarehouseData, WarehouseData
-from services.gemini_services.ai_analysis import analyze_warehouse_with_gemini
+from services.gemini_services.ai_analysis import GENERAL_AI_ANALYSIS, analyze_warehouse_with_gemini
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -67,6 +67,13 @@ def find_missing_fields(fields: dict) -> List[str]:
             missing.append(field_name)
     return missing
 
+from services.geolocation.geolocation_service import (
+    get_coordinates_mapbox,
+    get_coordinates_google,
+    get_driving_distance_and_time_google,
+    haversine,
+)
+
 async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
     origin_coords = get_coordinates_mapbox(origin_zip)
     if not origin_coords:
@@ -84,6 +91,16 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
         if not wh_coords:
             continue
 
+        # --- Step 1: Fast prefilter with Haversine ---
+        straight_line_miles = haversine(
+            origin_coords[0], origin_coords[1],
+            wh_coords[0], wh_coords[1]
+        )
+
+        if straight_line_miles > radius_miles * 2:
+            continue  # Skip if too far, no Google API call
+
+        # --- Step 2: Accurate check with Google API ---
         result = await get_driving_distance_and_time_google(origin_coords, wh_coords)
         if not result:
             continue
@@ -98,18 +115,20 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
             wh_copy["tier_rank"] = _tier_rank(wh["fields"].get("Tier"))
 
             wh_copy["tags"] = find_missing_fields(wh["fields"])
-            if wh_copy["tags"]:
-                wh_copy["has_missed_fields"] = True
-            else: 
-                wh_copy["has_missed_fields"] = False
-            
+            wh_copy["has_missed_fields"] = bool(wh_copy["tags"])
+
             nearby.append(wh_copy)
 
+    # --- Sort final list ---
     nearby.sort(key=lambda x: (x["tier_rank"], x["duration_minutes"], x["distance_miles"]))
 
-    
-    ai_analysis= await analyze_warehouse_with_gemini(nearby)
+    # --- AI analysis with fallback ---
+    try:
+        ai_analysis = await analyze_warehouse_with_gemini(nearby)
+    except Exception:
+        ai_analysis = GENERAL_AI_ANALYSIS
 
     return {"origin_zip": origin_zip, "warehouses": nearby, "ai_analysis": ai_analysis}
+
 
 
