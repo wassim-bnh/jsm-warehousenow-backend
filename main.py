@@ -9,13 +9,12 @@ async def lifespan(app: FastAPI):
     print("Caching..")
     yield
     print("App is shutting down...")
-    
+
 
 app = FastAPI(title="jsm-warehousenow", lifespan=lifespan)
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # <-- This allows all origins
+    allow_origins=["*"],  # allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

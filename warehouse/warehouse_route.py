@@ -4,7 +4,7 @@ import httpx
 import requests
 
 from services.messaging.email_service import send_bulk_email
-from warehouse.models import LocationRequest, ResponseModel, SendEmailData
+from warehouse.models import LocationRequest, ResponseModel, SendBulkEmailData, SendEmailData
 from warehouse.warehouse_service import fetch_warehouses_from_airtable, find_nearby_warehouses
 
 
@@ -35,9 +35,9 @@ async def find_nearby_warehouses_endpoint(request: LocationRequest):
 
 
 @warehouse_router.post("/send_email")
-async def send_bulk_email_endpoint(emails_data: list[SendEmailData]):
+async def send_bulk_email_endpoint(send_bulk_emails: SendBulkEmailData):
     try:
-        response = await send_bulk_email(emails_data)
+        response = await send_bulk_email(send_bulk_emails)
         return ResponseModel(status="success", data=response)
     except (httpx.HTTPError, requests.exceptions.RequestException) as e:
         raise HTTPException(status_code=502, detail=f"Error sending emails: {str(e)}")
