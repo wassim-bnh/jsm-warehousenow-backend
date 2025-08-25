@@ -1,7 +1,7 @@
 
 
 
-from warehouse.models import SendEmailData
+from warehouse.models import SendBulkEmailData, SendEmailData
 import aiosmtplib
 from email.message import EmailMessage
 from warehouse.models import SendEmailData
@@ -15,14 +15,16 @@ SMTP_PORT = os.getenv("SMTP_PORT")
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASS = os.getenv("SMTP_PASS")
 
-async def send_bulk_email(emails_data: list[SendEmailData]):
+async def send_bulk_email(send_bulk_emails: SendBulkEmailData):
     results = []
-    for email_data in emails_data:
-        result = await send_email(email_data)
+    for email_data in send_bulk_emails.emails_data:
+        subject = send_bulk_emails.email_subject
+        body = send_bulk_emails.email_body
+        result = await send_email(subject, body, email_data)
         results.append(result)
     return results
 
-async def send_email(email_data: SendEmailData):
+async def send_email(email_subject: str, email_body: str, email_data: SendEmailData):
     """
     Send a single email using SMTP
     """
@@ -35,8 +37,12 @@ async def send_email(email_data: SendEmailData):
         services_str = ", ".join(email_data.services[:-1]) + f" and {email_data.services[-1]}"
 
     # Construct subject & body
-    subject = f"Request for {services_str} near {email_data.adress}"
-    body = f"""Hi, 
+    if not email_subject:
+        subject = f"Request for {services_str} near {email_data.adress}"
+    else: subject = email_subject
+
+    if not email_body:
+        body = f"""Hi, 
 
 We have a request and would like to know if you can help with this.
 Please provide the following info below:
@@ -47,6 +53,8 @@ Pictures attached below:
 Best,
 WarehouseNow Team
         """
+
+    else: body = email_body
 
     # Build message
     message = EmailMessage()

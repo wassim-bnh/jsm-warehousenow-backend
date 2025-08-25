@@ -66,3 +66,8 @@ class SendEmailData(BaseModel):
     email: str
     services: list[str]
     adress: str
+
+class SendBulkEmailData(BaseModel):
+    email_subject: Optional[str] = None
+    email_body: Optional[str] = None
+    emails_data: list[SendEmailData]
