@@ -28,7 +28,6 @@ async def send_email(email_subject: str, email_body: str, email_data: SendEmailD
     """
     Send a single email using SMTP
     """
-    
     if not email_data.services:
         services_str = "general warehousing services"
     elif len(email_data.services) == 1:
@@ -36,32 +35,42 @@ async def send_email(email_subject: str, email_body: str, email_data: SendEmailD
     else:
         services_str = ", ".join(email_data.services[:-1]) + f" and {email_data.services[-1]}"
 
-    # Construct subject & body
-    if not email_subject:
-        subject = f"Request for {services_str} near {email_data.adress}"
-    else: subject = email_subject
+    # Construct subject
+    subject = email_subject or f"Request for {services_str} near {email_data.adress}"
 
+    # Default HTML body
     if not email_body:
-        body = f"""Hi, 
+        email_body = """\
+        <html>
+          <body>
+            <p>Hi,</p>
 
-We have a request and would like to know if you can help with this.
-Please provide the following info below:
-Pricing:
-Commodity:
-Loading method: palletized / slip sheets / floor loaded
-Pictures attached below:
-Best,
-WarehouseNow Team
+            <p>We have a request and would like to know if you can help with this.</p>
+
+            <p>Please provide pricing based on the following info below:</p>
+
+            <p>
+              <b>Commodity:</b><br>
+              <b>Loading method:</b> palletized / slip sheets / floor loaded
+            </p>
+
+            <p>Pictures attached below:</p>
+
+            <p>Best,<br>
+            WarehouseNow Team</p>
+          </body>
+        </html>
         """
-
-    else: body = email_body
 
     # Build message
     message = EmailMessage()
     message["From"] = SMTP_USER
     message["To"] = email_data.email
     message["Subject"] = subject
-    message.set_content(body)
+
+    # Add plain-text fallback + HTML version
+    message.set_content("Please view this email in HTML mode.")
+    message.add_alternative(email_body, subtype="html")
 
     try:
         await aiosmtplib.send(
