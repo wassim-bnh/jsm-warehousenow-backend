@@ -39,7 +39,5 @@ async def send_bulk_email_endpoint(send_bulk_emails: SendBulkEmailData):
     try:
         response = await send_bulk_email(send_bulk_emails)
         return ResponseModel(status="success", data=response)
-    except (httpx.HTTPError, requests.exceptions.RequestException) as e:
-        raise HTTPException(status_code=502, detail=f"Error sending emails: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")

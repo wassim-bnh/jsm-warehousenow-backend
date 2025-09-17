@@ -1,6 +1,5 @@
 
 from typing import List, Generic, TypeVar
-from pydantic.generics import GenericModel
 from pydantic import BaseModel
 
 class LocationRequest(BaseModel):
@@ -58,7 +57,7 @@ class FilterWarehouseData(BaseModel):
 
 T = TypeVar("T")
 
-class ResponseModel(GenericModel, Generic[T]):
+class ResponseModel(BaseModel, Generic[T]):
     status: str
     data: T
 
@@ -71,3 +70,4 @@ class SendBulkEmailData(BaseModel):
     email_subject: Optional[str] = None
     email_body: Optional[str] = None
     emails_data: list[SendEmailData]
+    images: list[str] = None

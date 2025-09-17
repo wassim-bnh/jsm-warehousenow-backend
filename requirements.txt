@@ -12,3 +12,9 @@ aiosmtplib
 pydantic[email]
 mangum
 gunicorn
+
+# Testing dependencies
+pytest
+pytest-asyncio
+pytest-cov
+httpx

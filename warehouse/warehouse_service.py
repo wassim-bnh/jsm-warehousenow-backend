@@ -46,6 +46,8 @@ async def fetch_warehouses_from_airtable() -> list[WarehouseData]:
             offset = data.get("offset")
             if not offset:
                 break
+    
+    print(records)
 
     return records
 
@@ -127,6 +129,7 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
         ai_analysis = await analyze_warehouse_with_gemini(nearby)
     except Exception:
         ai_analysis = GENERAL_AI_ANALYSIS
+
 
     return {"origin_zip": origin_zip, "warehouses": nearby, "ai_analysis": ai_analysis}
 
