@@ -1,21 +1,23 @@
 import os
-from typing import List
+import re
+from typing import List, Optional
 
 from pydantic import BaseModel
 import httpx
 import copy
 
 from services.geolocation.geolocation_service import get_coordinates_mapbox, get_driving_distance_and_time_mapbox, get_coordinates_google, get_driving_distance_and_time_google
-from warehouse.models import FilterWarehouseData, WarehouseData
+from warehouse.models import FilterWarehouseData, OrderData, WarehouseData
 from services.gemini_services.ai_analysis import GENERAL_AI_ANALYSIS, analyze_warehouse_with_gemini
 from dotenv import load_dotenv
 
 load_dotenv()
 AIRTABLE_TOKEN = os.getenv("AIRTABLE_TOKEN")
 BASE_ID = os.getenv("BASE_ID")
-TABLE_NAME = "Imported table" 
-VIEW_NAME = "warehouse"        
-
+WAREHOUSE_TABLE_NAME = "Imported table" 
+WAREHOUSE_VIEW_NAME = "warehouse"     
+ORDER_VIEW_NAME = "order"   
+ODER_TABLE_NAME = "Orders"
 
 #GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 #gmaps = googlemaps.Client(key=GOOGLE_MAPS_API_KEY)
@@ -25,12 +27,12 @@ class LocationRequest(BaseModel):
     radius_miles: float = 50  # default to 50 miles
     
 async def fetch_warehouses_from_airtable() -> list[WarehouseData]:
-    url = f"https://api.airtable.com/v0/{BASE_ID}/{TABLE_NAME}"
+    url = f"https://api.airtable.com/v0/{BASE_ID}/{WAREHOUSE_TABLE_NAME}"
     headers = {
         "Authorization": f"Bearer {AIRTABLE_TOKEN}"
     }
     params = {
-        "view": VIEW_NAME  # optional
+        "view": WAREHOUSE_VIEW_NAME  # optional
     }
 
     records = []
@@ -133,5 +135,38 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
 
     return {"origin_zip": origin_zip, "warehouses": nearby, "ai_analysis": ai_analysis}
 
+import httpx
 
+async def fetch_orders_by_requestid_from_airtable(request_id: int)-> Optional[OrderData]:
+    url = f"https://api.airtable.com/v0/{BASE_ID}/{ODER_TABLE_NAME}"
+    headers = {
+        "Authorization": f"Bearer {AIRTABLE_TOKEN}"
+    }
+    params = {
+        "filterByFormula": f"{{Request ID}} = {request_id}",
+        "view": ORDER_VIEW_NAME
+    }
 
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, headers=headers, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+
+    records = data.get("records", [])
+    if not records:
+        return None  # no order found
+
+    fields = records[0].get("fields", {})
+
+    # Parse the images field ("filename (url), filename (url)")
+    raw_images = fields.get("BOL & Pictures", "")
+    request_images = []
+    if raw_images:
+        # regex to extract (url) from "name (url)"
+        request_images = re.findall(r"\((https?://[^\)]+)\)", raw_images)
+
+    return OrderData(
+        commodity=fields.get("Commodity"),
+        loading_method=fields.get("Loading Style"),
+        request_images=request_images
+    )

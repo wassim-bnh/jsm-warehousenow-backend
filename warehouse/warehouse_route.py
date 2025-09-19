@@ -5,7 +5,7 @@ import requests
 
 from services.messaging.email_service import send_bulk_email
 from warehouse.models import LocationRequest, ResponseModel, SendBulkEmailData, SendEmailData
-from warehouse.warehouse_service import fetch_warehouses_from_airtable, find_nearby_warehouses
+from warehouse.warehouse_service import fetch_orders_by_requestid_from_airtable, fetch_warehouses_from_airtable, find_nearby_warehouses
 
 
 warehouse_router = APIRouter()
@@ -21,7 +21,16 @@ async def warehouses():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
-
+@warehouse_router.get("/requests")
+async def requests(request_id: int):
+    try:
+        data = await fetch_orders_by_requestid_from_airtable(request_id=request_id)
+        return ResponseModel(status="success", data=data)
+    except (httpx.HTTPError, requests.exceptions.RequestException) as e:
+        raise HTTPException(status_code=502, detail=f"Error fetching orders: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+    
 @warehouse_router.post("/nearby_warehouses")
 async def find_nearby_warehouses_endpoint(request: LocationRequest):
     try:
