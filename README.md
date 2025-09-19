@@ -146,6 +146,60 @@ jsm-warehousenow-backend/
     └── warehouse_service.py    # Warehouse business logic
 ```
 
+## 🧪 Testing
+
+### Running Tests
+
+The project includes comprehensive unit tests using pytest. To run the tests:
+
+1. **Install test dependencies** (included in requirements.txt)
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Run all tests**
+   ```bash
+   python run_tests.py
+   ```
+   
+   Or directly with pytest:
+   ```bash
+   pytest tests/ -v
+   ```
+
+3. **Run specific test files**
+   ```bash
+   python run_tests.py tests/test_warehouse_routes.py
+   pytest tests/test_warehouse_routes.py -v
+   ```
+
+4. **Run tests with coverage**
+   ```bash
+   pytest tests/ --cov=warehouse --cov=services --cov-report=html
+   ```
+
+### Test Structure
+
+```
+tests/
+├── conftest.py                    # Pytest configuration and fixtures
+├── test_warehouse_routes.py       # API endpoint tests
+├── test_warehouse_service.py      # Warehouse service tests
+├── test_geolocation_service.py    # Geolocation service tests
+├── test_email_service.py          # Email service tests
+├── test_ai_analysis.py            # AI analysis tests
+└── test_models.py                 # Pydantic model tests
+```
+
+### Test Coverage
+
+The test suite covers:
+- ✅ API endpoints (success and error cases)
+- ✅ Service layer functions
+- ✅ Data models validation
+- ✅ External API integrations (mocked)
+- ✅ Error handling scenarios
+
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -155,8 +209,17 @@ jsm-warehousenow-backend/
 | `MAPBOX_TOKEN` | Mapbox API token for geocoding and directions | Yes |
 | `AIRTABLE_TOKEN` | Airtable API token for warehouse data | Yes |
 | `BASE_ID` | Airtable base ID containing warehouse data | Yes |
+| `GOOGLE_MAPS_API_KEY` | Google Maps API key for geocoding and directions | Yes |
+| `GEMINI_API_KEY` | Google Gemini API key for AI analysis | Yes |
+| `SMTP_HOST` | SMTP server host for email sending | Yes |
+| `SMTP_PORT` | SMTP server port | Yes |
+| `SMTP_USER` | SMTP username | Yes |
+| `SMTP_PASS` | SMTP password | Yes |
 
 ### External Services
 
 - **Mapbox**: Geocoding and directions API
 - **Airtable**: Warehouse data storage and retrieval
+- **Google Maps**: Alternative geocoding and directions API
+- **Google Gemini**: AI analysis for warehouse recommendations
+- **SMTP Server**: Email delivery service

@@ -1,5 +1,6 @@
 
 import math
+import asyncio
 from dotenv import load_dotenv
 import requests
 import httpx
@@ -111,6 +112,34 @@ def get_coordinates_google(zip_code: str):
         print(f"Error fetching coordinates from Google Maps: {e}")
         return None
 
+async def get_coordinates_google_async(zip_code: str):
+    """
+    Async version of get_coordinates_google using thread pool.
+    """
+    if not GOOGLE_MAPS_API_KEY:
+        raise ValueError("GOOGLE_MAPS_API_KEY is missing. Please set it in your environment variables.")
+
+    try:
+        loop = asyncio.get_event_loop()
+        geocode_result = await loop.run_in_executor(
+            None, 
+            lambda: gmaps.geocode(
+                address=zip_code,
+                components={"country": "US"}
+            )
+        )
+
+        if not geocode_result:
+            return None
+
+        location = geocode_result[0]['geometry']['location']
+        lat, lon = location['lat'], location['lng']
+        return lat, lon
+
+    except Exception as e:
+        print(f"Error fetching coordinates from Google Maps: {e}")
+        return None
+
 
 async def get_driving_distance_and_time_google(origin_coords: tuple, dest_coords: tuple) -> dict:
     """
@@ -118,10 +147,14 @@ async def get_driving_distance_and_time_google(origin_coords: tuple, dest_coords
     origin_coords and dest_coords are tuples: (lat, lon)
     """
     try:
-        directions_result = gmaps.directions(
-            origin=origin_coords,
-            destination=dest_coords,
-            mode="driving"
+        loop = asyncio.get_event_loop()
+        directions_result = await loop.run_in_executor(
+            None,
+            lambda: gmaps.directions(
+                origin=origin_coords,
+                destination=dest_coords,
+                mode="driving"
+            )
         )
 
         if not directions_result:
