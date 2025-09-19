@@ -31,26 +31,78 @@ async def analyze_warehouse_with_gemini(warehouses: list[dict]) -> str:
 
     # Extract the top 3 for explicit reasoning
     top_three = warehouse_data[:3]
+    
+    # Handle cases with fewer than 3 warehouses
+    if len(top_three) == 0:
+        prompt = f"""
+        You are analyzing the results of a warehouse search for logistics optimization.  
+        The system returned {len(warehouses)} warehouses, ranked by tier priority
+        (Gold > Silver > Bronze) and then by driving time/distance.
 
-    prompt = f"""
-    You are analyzing the results of a warehouse search for logistics optimization.  
-    The system returned {len(warehouses)} warehouses, ranked by tier priority
-    (Gold > Silver > Bronze) and then by driving time/distance.
+        No warehouses were found in the search results.
 
-    Ranked warehouse data:
-    {warehouse_data}
+        Please provide a concise businesslike analysis explaining that no warehouses 
+        were found and suggest potential next steps.
+        """
+    elif len(top_three) == 1:
+        prompt = f"""
+        You are analyzing the results of a warehouse search for logistics optimization.  
+        The system returned {len(warehouses)} warehouse, ranked by tier priority
+        (Gold > Silver > Bronze) and then by driving time/distance.
 
-    Focus on the top three warehouses:
-    {top_three}
+        Ranked warehouse data:
+        {warehouse_data}
 
-    Please provide a concise businesslike analysis (2-3 sentences) that includes:
-    1. Specific justification for why {top_three[0]["Name"]}, {top_three[1]["Name"]}, 
-       and {top_three[2]["Name"]} were ranked as the top three.  
-    2. How tier vs. distance/time influenced the overall order.  
-    3. Any concerns with missing data fields that could affect decision-making.  
+        Focus on the top warehouse:
+        {top_three}
 
-    Keep the response factual and clear.
-    """
+        Please provide a concise businesslike analysis (2-3 sentences) that includes:
+        1. Specific justification for why {top_three[0]["Name"]} was ranked as the top warehouse.
+        2. How tier vs. distance/time influenced the ranking.
+        3. Any concerns with missing data fields that could affect decision-making.
+
+        Keep the response factual and clear.
+        """
+    elif len(top_three) == 2:
+        prompt = f"""
+        You are analyzing the results of a warehouse search for logistics optimization.  
+        The system returned {len(warehouses)} warehouses, ranked by tier priority
+        (Gold > Silver > Bronze) and then by driving time/distance.
+
+        Ranked warehouse data:
+        {warehouse_data}
+
+        Focus on the top two warehouses:
+        {top_three}
+
+        Please provide a concise businesslike analysis (2-3 sentences) that includes:
+        1. Specific justification for why {top_three[0]["Name"]} and {top_three[1]["Name"]} 
+           were ranked as the top two warehouses.
+        2. How tier vs. distance/time influenced the overall order.
+        3. Any concerns with missing data fields that could affect decision-making.
+
+        Keep the response factual and clear.
+        """
+    else:
+        prompt = f"""
+        You are analyzing the results of a warehouse search for logistics optimization.  
+        The system returned {len(warehouses)} warehouses, ranked by tier priority
+        (Gold > Silver > Bronze) and then by driving time/distance.
+
+        Ranked warehouse data:
+        {warehouse_data}
+
+        Focus on the top three warehouses:
+        {top_three}
+
+        Please provide a concise businesslike analysis (2-3 sentences) that includes:
+        1. Specific justification for why {top_three[0]["Name"]}, {top_three[1]["Name"]}, 
+           and {top_three[2]["Name"]} were ranked as the top three.
+        2. How tier vs. distance/time influenced the overall order.
+        3. Any concerns with missing data fields that could affect decision-making.
+
+        Keep the response factual and clear.
+        """
 
     response = await model.generate_content_async(prompt)
     return response.text.strip()
