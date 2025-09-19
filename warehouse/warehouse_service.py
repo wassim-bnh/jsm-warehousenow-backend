@@ -1,12 +1,15 @@
 import os
 import re
-from typing import List, Optional
+import time
+import asyncio
+from typing import List, Optional, Dict, Any, Tuple
+from threading import Lock
 
 from pydantic import BaseModel
 import httpx
 import copy
 
-from services.geolocation.geolocation_service import get_coordinates_mapbox, get_driving_distance_and_time_mapbox, get_coordinates_google, get_driving_distance_and_time_google
+from services.geolocation.geolocation_service import get_coordinates_mapbox, get_coordinates_google, get_driving_distance_and_time_google, get_coordinates_google_async
 from warehouse.models import FilterWarehouseData, OrderData, WarehouseData
 from services.gemini_services.ai_analysis import GENERAL_AI_ANALYSIS, analyze_warehouse_with_gemini
 from dotenv import load_dotenv
@@ -19,14 +22,116 @@ WAREHOUSE_VIEW_NAME = "Warehouse Master View"
 ODER_TABLE_NAME = "Requests"   
 ORDER_VIEW_NAME = "All Requests"
 
-#GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
-#gmaps = googlemaps.Client(key=GOOGLE_MAPS_API_KEY)
+
+# In-memory cache for performance optimization
+class MemoryCache:
+    def __init__(self):
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._lock = Lock()
+    
+    def _is_expired(self, entry: Dict[str, Any]) -> bool:
+        return time.time() > entry.get('expires_at', 0)
+    
+    def get(self, key: str) -> Optional[Any]:
+        with self._lock:
+            if key in self._cache:
+                entry = self._cache[key]
+                if not self._is_expired(entry):
+                    return entry['value']
+                else:
+                    del self._cache[key]
+            return None
+    
+    def set(self, key: str, value: Any, ttl: int = 3600) -> None:
+        with self._lock:
+            self._cache[key] = {
+                'value': value,
+                'expires_at': time.time() + ttl
+            }
+
+# Global cache instance
+_cache = MemoryCache()
 
 class LocationRequest(BaseModel):
     zip_code: str
     radius_miles: float = 50  # default to 50 miles
+
+# Optimized async functions with caching
+async def get_coordinates_cached(zip_code: str) -> Optional[Tuple[float, float]]:
+    """Get coordinates with caching."""
+    cache_key = f"coords:{zip_code}"
+    cached = _cache.get(cache_key)
+    if cached:
+        return cached
     
-async def fetch_warehouses_from_airtable() -> list[WarehouseData]:
+    coords = await get_coordinates_google_async(zip_code)
+    if coords:
+        _cache.set(cache_key, coords, ttl=86400)  # 24 hours
+    return coords
+
+async def get_driving_data_cached(origin_coords: Tuple[float, float], dest_coords: Tuple[float, float], origin_zip: str, dest_zip: str) -> Optional[Dict[str, float]]:
+    """Get driving data with caching."""
+    cache_key = f"driving:{origin_zip}:{dest_zip}"
+    cached = _cache.get(cache_key)
+    if cached:
+        return cached
+    
+    result = await get_driving_distance_and_time_google(origin_coords, dest_coords)
+    if result:
+        _cache.set(cache_key, result, ttl=86400)  # 24 hours
+    return result
+
+async def batch_get_coordinates(zip_codes: List[str], max_concurrent: int = 10) -> Dict[str, Optional[Tuple[float, float]]]:
+    """Get coordinates for multiple ZIP codes concurrently."""
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def get_single_coords(zip_code: str) -> Tuple[str, Optional[Tuple[float, float]]]:
+        async with semaphore:
+            coords = await get_coordinates_cached(zip_code)
+            return zip_code, coords
+    
+    tasks = [get_single_coords(zip_code) for zip_code in zip_codes]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    coordinate_map = {}
+    for result in results:
+        if isinstance(result, Exception):
+            continue
+        zip_code, coords = result
+        coordinate_map[zip_code] = coords
+    
+    return coordinate_map
+
+async def batch_get_driving_data(origin_coords: Tuple[float, float], dest_coords_list: List[Tuple[float, float]], origin_zip: str, dest_zips: List[str], max_concurrent: int = 5) -> List[Optional[Dict[str, float]]]:
+    """Get driving data for multiple destinations concurrently."""
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def get_single_driving(dest_coords: Tuple[float, float], dest_zip: str) -> Optional[Dict[str, float]]:
+        async with semaphore:
+            return await get_driving_data_cached(origin_coords, dest_coords, origin_zip, dest_zip)
+    
+    tasks = []
+    for i, dest_coords in enumerate(dest_coords_list):
+        dest_zip = dest_zips[i] if i < len(dest_zips) else None
+        tasks.append(get_single_driving(dest_coords, dest_zip))
+    
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    driving_data_list = []
+    for result in results:
+        if isinstance(result, Exception):
+            driving_data_list.append(None)
+        else:
+            driving_data_list.append(result)
+    
+    return driving_data_list
+
+async def fetch_warehouses_from_airtable() -> list[any]:
+    # Check cache first
+    cached_warehouses = _cache.get("warehouses:all")
+    if cached_warehouses:
+        return cached_warehouses
+    
     url = f"https://api.airtable.com/v0/{BASE_ID}/{WAREHOUSE_TABLE_NAME}"
     headers = {
         "Authorization": f"Bearer {AIRTABLE_TOKEN}"
@@ -48,9 +153,9 @@ async def fetch_warehouses_from_airtable() -> list[WarehouseData]:
             offset = data.get("offset")
             if not offset:
                 break
-    
-    print(records)
 
+    # Cache the result for 1 hour
+    _cache.set("warehouses:all", records, ttl=3600)
     return records
 
 # Find nearby warehouses (openStreetMap)
@@ -79,59 +184,92 @@ from services.geolocation.geolocation_service import (
 )
 
 async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
+    """Optimized version with caching and batch processing."""
     origin_coords = get_coordinates_mapbox(origin_zip)
     if not origin_coords:
         return {"error": "Invalid ZIP code"}
 
     warehouses: List[WarehouseData] = await fetch_warehouses_from_airtable()
-    nearby: List[WarehouseData] = []
-
+    
+    # Extract unique ZIP codes and filter warehouses
+    unique_zips = set()
+    valid_warehouses = []
+    
     for wh in warehouses:
-        wh_zip = wh["fields"].get("Zip")
-        if not wh_zip:
-            continue
-
-        wh_coords = get_coordinates_google(wh_zip)
+        wh_zip = wh["fields"].get("ZIP")
+        if wh_zip:
+            unique_zips.add(wh_zip)
+            valid_warehouses.append(wh)
+    
+    # Batch get coordinates for all unique ZIP codes
+    zip_coords_map = await batch_get_coordinates(list(unique_zips), max_concurrent=10)
+    
+    # Pre-filter warehouses using Haversine distance
+    candidate_warehouses = []
+    for wh in valid_warehouses:
+        wh_zip = wh["fields"].get("ZIP")
+        wh_coords = zip_coords_map.get(wh_zip)
+        
         if not wh_coords:
             continue
-
-        # --- Step 1: Fast prefilter with Haversine ---
+            
+        # Fast pre-filter with Haversine
         straight_line_miles = haversine(
             origin_coords[0], origin_coords[1],
             wh_coords[0], wh_coords[1]
         )
-
-        if straight_line_miles > radius_miles * 2:
-            continue  # Skip if too far, no Google API call
-
-        # --- Step 2: Accurate check with Google API ---
-        result = await get_driving_distance_and_time_google(origin_coords, wh_coords)
-        if not result:
+        
+        if straight_line_miles <= radius_miles * 2:  # 2x buffer for driving distance
+            candidate_warehouses.append({
+                'warehouse': wh,
+                'coordinates': wh_coords,
+                'zip': wh_zip
+            })
+    
+    if not candidate_warehouses:
+        return {"origin_zip": origin_zip, "warehouses": [], "ai_analysis": GENERAL_AI_ANALYSIS}
+    
+    # Batch get driving data for candidates
+    dest_coords_list = [candidate['coordinates'] for candidate in candidate_warehouses]
+    dest_zips = [candidate['zip'] for candidate in candidate_warehouses]
+    
+    driving_results = await batch_get_driving_data(
+        origin_coords, 
+        dest_coords_list,
+        origin_zip,
+        dest_zips,
+        max_concurrent=5
+    )
+    
+    # Process results and build final list
+    nearby: List[WarehouseData] = []
+    for i, candidate in enumerate(candidate_warehouses):
+        driving_data = driving_results[i]
+        if not driving_data:
             continue
-
-        distance_miles = result["distance_miles"]
-        duration_minutes = result["duration_minutes"]
-
+            
+        distance_miles = driving_data["distance_miles"]
+        duration_minutes = driving_data["duration_minutes"]
+        
         if distance_miles <= radius_miles:
+            wh = candidate['warehouse']
             wh_copy = copy.copy(wh)
             wh_copy["distance_miles"] = distance_miles
             wh_copy["duration_minutes"] = duration_minutes
             wh_copy["tier_rank"] = _tier_rank(wh["fields"].get("Tier"))
-
             wh_copy["tags"] = find_missing_fields(wh["fields"])
             wh_copy["has_missed_fields"] = bool(wh_copy["tags"])
-
+            
             nearby.append(wh_copy)
-
-    # --- Sort final list ---
+    
+    # Sort final list
     nearby.sort(key=lambda x: (x["tier_rank"], x["duration_minutes"], x["distance_miles"]))
 
-    # --- AI analysis with fallback ---
+    # AI analysis with fallback
     try:
         ai_analysis = await analyze_warehouse_with_gemini(nearby)
     except Exception:
         ai_analysis = GENERAL_AI_ANALYSIS
-
 
     return {"origin_zip": origin_zip, "warehouses": nearby, "ai_analysis": ai_analysis}
 
