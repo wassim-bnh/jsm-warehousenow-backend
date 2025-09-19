@@ -12,6 +12,8 @@ aiosmtplib
 pydantic[email]
 mangum
 gunicorn
+uvicorn
+aiohttp
 
 # Testing dependencies
 pytest
