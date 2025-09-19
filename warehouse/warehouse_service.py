@@ -14,10 +14,10 @@ from dotenv import load_dotenv
 load_dotenv()
 AIRTABLE_TOKEN = os.getenv("AIRTABLE_TOKEN")
 BASE_ID = os.getenv("BASE_ID")
-WAREHOUSE_TABLE_NAME = "Imported table" 
-WAREHOUSE_VIEW_NAME = "warehouse"     
-ORDER_VIEW_NAME = "order"   
-ODER_TABLE_NAME = "Orders"
+WAREHOUSE_TABLE_NAME = "Warehouses" 
+WAREHOUSE_VIEW_NAME = "Warehouse Master View"     
+ODER_TABLE_NAME = "Requests"   
+ORDER_VIEW_NAME = "All Requests"
 
 #GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 #gmaps = googlemaps.Client(key=GOOGLE_MAPS_API_KEY)
@@ -137,7 +137,7 @@ async def find_nearby_warehouses(origin_zip: str, radius_miles: float):
 
 import httpx
 
-async def fetch_orders_by_requestid_from_airtable(request_id: int)-> Optional[OrderData]:
+async def fetch_orders_by_requestid_from_airtable(request_id: int) -> List[OrderData]:
     url = f"https://api.airtable.com/v0/{BASE_ID}/{ODER_TABLE_NAME}"
     headers = {
         "Authorization": f"Bearer {AIRTABLE_TOKEN}"
@@ -154,19 +154,58 @@ async def fetch_orders_by_requestid_from_airtable(request_id: int)-> Optional[Or
 
     records = data.get("records", [])
     if not records:
-        return None  # no order found
+        return []  # return empty list if no matches
 
-    fields = records[0].get("fields", {})
+    results: List[OrderData] = []
 
-    # Parse the images field ("filename (url), filename (url)")
-    raw_images = fields.get("BOL & Pictures", "")
-    request_images = []
-    if raw_images:
-        # regex to extract (url) from "name (url)"
-        request_images = re.findall(r"\((https?://[^\)]+)\)", raw_images)
+    for record in records:
+        fields = record.get("fields", {})
 
-    return OrderData(
-        commodity=fields.get("Commodity"),
-        loading_method=fields.get("Loading Style"),
-        request_images=request_images
-    )
+        request_images: List[str] = []
+        raw_images = fields.get("BOL & Pictures")
+
+        if isinstance(raw_images, str):
+            # Case: "filename (url), filename (url)"
+            request_images = re.findall(r"\((https?://[^\)]+)\)", raw_images)
+
+        elif isinstance(raw_images, list):
+            # Case: array of objects with "url"
+            for img in raw_images:
+                if isinstance(img, dict) and "url" in img:
+                    request_images.append(img["url"])
+
+        results.append(
+            OrderData(
+                commodity=fields.get("Commodity"),
+                loading_method=fields.get("Loading Style"),
+                request_images=request_images
+            )
+        )
+
+    return results
+
+
+async def fetch_orders_from_airtable():
+    url = f"https://api.airtable.com/v0/{BASE_ID}/{ODER_TABLE_NAME}"
+    headers = {
+        "Authorization": f"Bearer {AIRTABLE_TOKEN}"
+    }
+    params = {
+        "view": ORDER_VIEW_NAME  # optional
+    }
+
+    records = []
+    async with httpx.AsyncClient() as client:
+        offset = None
+        while True:
+            if offset:
+                params["offset"] = offset
+            resp = await client.get(url, headers=headers, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+            records.extend(data.get("records", []))
+            offset = data.get("offset")
+            if not offset:
+                break
+    
+    return records
