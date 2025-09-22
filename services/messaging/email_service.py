@@ -1,8 +1,10 @@
 
 
 
+import base64
 import logging
 import mimetypes
+import re
 
 import aiohttp
 from warehouse.models import SendBulkEmailData, SendEmailData
@@ -29,13 +31,14 @@ async def send_bulk_email(send_bulk_emails: SendBulkEmailData):
         results.append(result)
     return results
 
+
 async def send_email(
     email_subject: str,
     email_body: str,
     email_data: SendEmailData,
     image_paths_or_urls: list[str] = None,
 ):
-    """Send a single email with optional attachments (local or URL)."""
+    """Send a single email with optional attachments (local, URL, or Base64)."""
 
     # --- subject ---
     if not email_data.services:
@@ -78,7 +81,34 @@ async def send_email(
         async with aiohttp.ClientSession() as session:
             for item in image_paths_or_urls:
                 try:
-                    if item.startswith("http://") or item.startswith("https://"):
+                    # Handle Base64 data URLs (from frontend uploads)
+                    if item.startswith("data:"):
+                        # Extract MIME type and data
+                        match = re.match(r'data:([^;]+);base64,(.+)', item)
+                        if match:
+                            mime_type = match.group(1)
+                            base64_data = match.group(2)
+                            
+                            # Decode Base64 data
+                            file_data = base64.b64decode(base64_data)
+                            
+                            # Extract filename and subtype
+                            maintype, subtype = mime_type.split("/", 1)
+                            filename = f"attachment.{subtype}"
+                            
+                            logging.info(f"Attaching Base64 image ({mime_type}), {len(file_data)} bytes")
+                            
+                            message.add_attachment(
+                                file_data,
+                                maintype=maintype,
+                                subtype=subtype,
+                                filename=filename,
+                            )
+                        else:
+                            logging.warning(f"Invalid Base64 data URL format: {item[:50]}...")
+                    
+                    # Handle HTTP/HTTPS URLs
+                    elif item.startswith("http://") or item.startswith("https://"):
                         async with session.get(item) as resp:
                             if resp.status != 200:
                                 raise ValueError(f"Failed to download {item}, status {resp.status}")
@@ -112,9 +142,9 @@ async def send_email(
                                 subtype=subtype,
                                 filename=filename,
                             )
-
+                    
+                    # Handle local file paths
                     else:
-                        # Local file
                         with open(item, "rb") as f:
                             file_data = f.read()
                             mime_type, _ = mimetypes.guess_type(item)
@@ -131,6 +161,7 @@ async def send_email(
                                 subtype=subtype,
                                 filename=filename,
                             )
+                            
                 except Exception as attach_err:
                     logging.warning(f"Failed to attach {item}: {attach_err}")
 
