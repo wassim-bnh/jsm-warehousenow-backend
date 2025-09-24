@@ -61,11 +61,10 @@ async def send_bulk_email_endpoint(send_bulk_emails: SendBulkEmailData):
 
 # Cache management endpoints
 @warehouse_router.post("/cache/refresh")
-async def refresh_cache(admin_key: str = None):
+async def refresh_cache():
     """Manually refresh warehouse cache from Airtable."""
     try:
         # Optional: Add admin authentication for production
-        # if admin_key != os.getenv("ADMIN_KEY"):
         #     raise HTTPException(status_code=401, detail="Invalid admin key")
         
         # Force refresh by bypassing cache
