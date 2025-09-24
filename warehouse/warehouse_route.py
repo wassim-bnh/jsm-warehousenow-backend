@@ -2,10 +2,12 @@ from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
 import httpx
 import requests
+import os
+import time
 
 from services.messaging.email_service import send_bulk_email
 from warehouse.models import LocationRequest, ResponseModel, SendBulkEmailData, SendEmailData
-from warehouse.warehouse_service import fetch_orders_by_requestid_from_airtable, fetch_orders_from_airtable, fetch_warehouses_from_airtable, find_nearby_warehouses
+from warehouse.warehouse_service import fetch_orders_by_requestid_from_airtable, fetch_orders_from_airtable, fetch_warehouses_from_airtable, find_nearby_warehouses, invalidate_warehouse_cache, get_cache_status
 
 
 warehouse_router = APIRouter()
@@ -56,3 +58,79 @@ async def send_bulk_email_endpoint(send_bulk_emails: SendBulkEmailData):
         return ResponseModel(status="success", data=response)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+# Cache management endpoints
+@warehouse_router.post("/cache/refresh")
+async def refresh_cache(admin_key: str = None):
+    """Manually refresh warehouse cache from Airtable."""
+    try:
+        # Optional: Add admin authentication for production
+        # if admin_key != os.getenv("ADMIN_KEY"):
+        #     raise HTTPException(status_code=401, detail="Invalid admin key")
+        
+        # Force refresh by bypassing cache
+        warehouses = await fetch_warehouses_from_airtable(force_refresh=True)
+        return ResponseModel(
+            status="success", 
+            data={
+                "message": "Cache refreshed successfully",
+                "warehouse_count": len(warehouses),
+                "timestamp": time.time()
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cache refresh failed: {str(e)}")
+
+@warehouse_router.delete("/cache/clear")
+async def clear_cache():
+    """Clear all warehouse-related cache."""
+    try:
+        result = await invalidate_warehouse_cache()
+        return ResponseModel(status="success", data=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cache clear failed: {str(e)}")
+
+@warehouse_router.get("/cache/status")
+async def get_cache_status_endpoint():
+    """Get detailed cache status and recommendations."""
+    try:
+        status = await get_cache_status()
+        return ResponseModel(status="success", data=status)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get cache status: {str(e)}")
+
+
+@warehouse_router.post("/webhook/airtable")
+async def airtable_webhook(request: dict):
+    """Handle Airtable webhook notifications for real-time cache invalidation."""
+    try:
+        # Optional: Add webhook authentication
+        # webhook_secret = request.headers.get("X-Airtable-Webhook-Secret")
+        # if webhook_secret != os.getenv("AIRTABLE_WEBHOOK_SECRET"):
+        #     raise HTTPException(status_code=401, detail="Invalid webhook secret")
+        
+        # Airtable webhook payload structure
+        webhook_data = request.get("webhook", {})
+        base_id = webhook_data.get("base", {}).get("id")
+        
+        # Only process webhooks for our warehouse base
+        if base_id == os.getenv("BASE_ID"):
+            # Clear cache when Airtable data changes
+            await invalidate_warehouse_cache()
+            
+            return ResponseModel(
+                status="success", 
+                data={
+                    "message": "Cache invalidated due to Airtable changes",
+                    "base_id": base_id,
+                    "timestamp": time.time()
+                }
+            )
+        else:
+            return ResponseModel(
+                status="ignored", 
+                data={"message": "Webhook ignored - different base ID"}
+            )
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Webhook processing failed: {str(e)}")
