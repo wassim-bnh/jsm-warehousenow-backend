@@ -18,9 +18,7 @@ load_dotenv()
 AIRTABLE_TOKEN = os.getenv("AIRTABLE_TOKEN")
 BASE_ID = os.getenv("BASE_ID")
 WAREHOUSE_TABLE_NAME = "Warehouses" 
-WAREHOUSE_VIEW_NAME = "Warehouse Master View"     
-ODER_TABLE_NAME = "Requests"   
-ORDER_VIEW_NAME = "All Requests"
+ODER_TABLE_NAME = "Requests"
 
 
 # In-memory cache for performance optimization
@@ -137,7 +135,7 @@ async def fetch_warehouses_from_airtable() -> list[any]:
         "Authorization": f"Bearer {AIRTABLE_TOKEN}"
     }
     params = {
-        "view": WAREHOUSE_VIEW_NAME  # optional
+        # Removed view parameter to fetch all warehouses regardless of view state
     }
 
     records = []
@@ -282,7 +280,7 @@ async def fetch_orders_by_requestid_from_airtable(request_id: int) -> List[Order
     }
     params = {
         "filterByFormula": f"{{Request ID}} = {request_id}",
-        "view": ORDER_VIEW_NAME
+        # Removed view parameter to fetch all orders regardless of view state
     }
 
     async with httpx.AsyncClient() as client:
@@ -329,7 +327,7 @@ async def fetch_orders_from_airtable():
         "Authorization": f"Bearer {AIRTABLE_TOKEN}"
     }
     params = {
-        "view": ORDER_VIEW_NAME  # optional
+        # Removed view parameter to fetch all orders regardless of view state
     }
 
     records = []
