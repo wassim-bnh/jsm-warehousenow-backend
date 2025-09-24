@@ -26,6 +26,8 @@ class MemoryCache:
     def __init__(self):
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._lock = Lock()
+        self._last_airtable_check = 0
+        self._airtable_check_interval = 300  
     
     def _is_expired(self, entry: Dict[str, Any]) -> bool:
         return time.time() > entry.get('expires_at', 0)
@@ -44,7 +46,45 @@ class MemoryCache:
         with self._lock:
             self._cache[key] = {
                 'value': value,
-                'expires_at': time.time() + ttl
+                'expires_at': time.time() + ttl,
+                'created_at': time.time()
+            }
+    
+    def delete(self, key: str) -> None:
+        """Delete a specific cache entry."""
+        with self._lock:
+            self._cache.pop(key, None)
+    
+    def clear_warehouse_cache(self) -> None:
+        """Clear all warehouse-related cache entries."""
+        with self._lock:
+            keys_to_delete = [key for key in self._cache.keys() if key.startswith(('warehouses:', 'coords:', 'driving:'))]
+            for key in keys_to_delete:
+                del self._cache[key]
+    
+    def should_check_airtable(self) -> bool:
+        """Check if we should verify Airtable for updates."""
+        current_time = time.time()
+        if current_time - self._last_airtable_check > self._airtable_check_interval:
+            self._last_airtable_check = current_time
+            return True
+        return False
+    
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics for monitoring."""
+        with self._lock:
+            current_time = time.time()
+            total_entries = len(self._cache)
+            expired_entries = sum(1 for entry in self._cache.values() if self._is_expired(entry))
+            warehouse_entries = sum(1 for key in self._cache.keys() if key.startswith('warehouses:'))
+            
+            return {
+                'total_entries': total_entries,
+                'expired_entries': expired_entries,
+                'active_entries': total_entries - expired_entries,
+                'warehouse_entries': warehouse_entries,
+                'last_airtable_check': self._last_airtable_check,
+                'cache_age_hours': (current_time - self._last_airtable_check) / 3600
             }
 
 # Global cache instance
@@ -124,12 +164,19 @@ async def batch_get_driving_data(origin_coords: Tuple[float, float], dest_coords
     
     return driving_data_list
 
-async def fetch_warehouses_from_airtable() -> list[any]:
-    # Check cache first
-    cached_warehouses = _cache.get("warehouses:all")
-    if cached_warehouses:
-        return cached_warehouses
+async def fetch_warehouses_from_airtable(force_refresh: bool = False) -> list[any]:
+    """Fetch warehouses with smart caching and invalidation strategies."""
     
+    # Check if we should verify Airtable for updates
+    should_check = _cache.should_check_airtable() or force_refresh
+    
+    if not should_check:
+        # Return cached data if available and not expired
+        cached_warehouses = _cache.get("warehouses:all")
+        if cached_warehouses:
+            return cached_warehouses
+    
+    # Fetch fresh data from Airtable
     url = f"https://api.airtable.com/v0/{BASE_ID}/{WAREHOUSE_TABLE_NAME}"
     headers = {
         "Authorization": f"Bearer {AIRTABLE_TOKEN}"
@@ -152,9 +199,41 @@ async def fetch_warehouses_from_airtable() -> list[any]:
             if not offset:
                 break
 
-    # Cache the result for 1 hour
-    _cache.set("warehouses:all", records, ttl=3600)
+    # Smart TTL based on data freshness
+    # Shorter TTL for more frequent checks, longer for stable data
+    ttl = 1800 if should_check else 3600  # 30 min vs 1 hour
+    
+    # Cache the result
+    _cache.set("warehouses:all", records, ttl=ttl)
     return records
+
+async def invalidate_warehouse_cache() -> Dict[str, Any]:
+    """Manually invalidate warehouse cache."""
+    _cache.clear_warehouse_cache()
+    return {"status": "success", "message": "Warehouse cache cleared"}
+
+async def get_cache_status() -> Dict[str, Any]:
+    """Get detailed cache status for monitoring."""
+    stats = _cache.get_cache_stats()
+    return {
+        "cache_stats": stats,
+        "recommendations": _get_cache_recommendations(stats)
+    }
+
+def _get_cache_recommendations(stats: Dict[str, Any]) -> List[str]:
+    """Get cache optimization recommendations."""
+    recommendations = []
+    
+    if stats['cache_age_hours'] > 2:
+        recommendations.append("Consider refreshing cache - data is over 2 hours old")
+    
+    if stats['expired_entries'] > stats['active_entries']:
+        recommendations.append("High expired entries - consider shorter TTL")
+    
+    if stats['warehouse_entries'] == 0:
+        recommendations.append("No warehouse data cached - may need manual refresh")
+    
+    return recommendations
 
 # Find nearby warehouses (openStreetMap)
 def _tier_rank(tier: str) -> int:
