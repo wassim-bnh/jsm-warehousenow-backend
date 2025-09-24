@@ -51,7 +51,7 @@ jobs:
       run: |
         echo "🎉 Cache refresh completed successfully at $(date)"
       
- - name: Notify on Failure
+    - name: Notify on Failure
       if: failure()
       run: |
         echo "💥 Cache refresh failed at $(date)"
